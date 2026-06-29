@@ -138,6 +138,7 @@
             input.value = "";
 
             const aiDiv = addMessage("ai", "");
+            let aiText = "";
 
             try {
                 const response = await fetch("/chat/stream", {
@@ -160,7 +161,7 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
 
-                let aiText = "";
+                let buffer = "";
 
                 while (true) {
                     const { value, done } = await reader.read();
@@ -169,11 +170,34 @@
                         break;
                     }
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    aiText += chunk;
+                    buffer += decoder.decode(value, { stream: true });
 
-                    aiDiv.innerHTML = `<span class="ai">AI：</span>${aiText}`;
-                    chatBox.scrollTop = chatBox.scrollHeight;
+                    const events = buffer.split("\n\n");
+                    buffer = events.pop();
+
+                    for (const event of events) {
+                        const lines = event.split("\n");
+
+                        for (const line of lines) {
+                            if (line.startsWith("data: ")) {
+                                const jsonStr = line.replace("data: ", "").trim();
+
+                                if (!jsonStr || jsonStr === "{}") {
+                                    continue;
+                                }
+
+                                try {
+                                    const data = JSON.parse(jsonStr);
+                                    aiText += data.content || "";
+
+                                    aiDiv.innerHTML = `<span class="ai">AI：</span>${aiText}`;
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                } catch (e) {
+                                    console.error("SSE 解析失败：", jsonStr, e);
+                                }
+                            }
+                        }
+                    }
                 }
 
             } catch (error) {
