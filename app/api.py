@@ -15,6 +15,7 @@ from app.logger import logger
 
 from app.utils import clear_chat_history
 import time
+import json
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,9 +79,27 @@ def chat_stream(request: ChatRequest):
 
     logger.info(f"收到流式请求：session_id={request.session_id}, message={user_message}")
 
+    def event_generator():
+        for chunk in stream_chat_with_ai(user_message, session_id=request.session_id):
+            if not chunk:
+                continue
+
+            data = {
+                "content": chunk
+            }
+
+            yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+        yield "event: done\ndata: {}\n\n"
+
     return StreamingResponse(
-        stream_chat_with_ai(user_message, session_id=request.session_id),
-        media_type="text/plain; charset=utf-8"
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
 
 
