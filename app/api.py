@@ -14,7 +14,7 @@ from app.chat import chat_with_ai, stream_chat_with_ai
 from app.logger import logger
 
 from app.utils import clear_chat_history
-
+import time
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,4 +81,22 @@ def chat_stream(request: ChatRequest):
     return StreamingResponse(
         stream_chat_with_ai(user_message, session_id=request.session_id),
         media_type="text/plain; charset=utf-8"
+    )
+
+
+
+@app.get("/test/stream")
+def test_stream():
+    def generate():
+        for i in range(1, 6):
+            yield f"data: 第 {i} 段内容\n\n"
+            time.sleep(1)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
     )
